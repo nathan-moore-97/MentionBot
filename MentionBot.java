@@ -1,4 +1,5 @@
 
+
 //Imports for System IO
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -28,9 +29,13 @@ import twitter4j.conf.ConfigurationBuilder;
  *                 the ArrayList if the length of the message AND the
  *                 "@targetScreenName" is less than or equal to 140 characters  
  *                 
+ *                 NAM 14.12.2017: Made some changes to the way its set up to 
+ *                 remove any association to the twitter account it used to be 
+ *                 linked to - moved authentication keys into a new class. 
+ *                 
  * 
  * @author nathanmoore
- * @version 2.1 October 14th, 2017
+ * @version 3.0 December 14th, 2017
  */
 
 public class MentionBot {
@@ -60,7 +65,7 @@ public class MentionBot {
     
     /**
      * MentionBot Constructor - initializes and instantiates the class level
-     * attributes. Creates the connection between 
+     * attributes. 
      * 
      * TODO - It may be a good idea incorporate file reading and writing to 
      * set the initial state of lastReplyIndex, to lessen the chance of 
@@ -72,7 +77,15 @@ public class MentionBot {
     private MentionBot( String userScreenName ) {
         
         // initial states for the bot
-        initBotData();
+        replies = 0;
+        failures = 0;
+        lastReplyIndex = -1; 
+        cycles = 0;
+        
+        keys = new TwitterKeys();
+        
+        messages = new ArrayList<String>();
+        populateMessages();
         
         //Twitter stuff
         cb = new ConfigurationBuilder();
@@ -90,7 +103,7 @@ public class MentionBot {
         
     }
 
-    /************************* MentionBot Main method *************************/
+    /************************* MentionBot Main *************************/
     
     /**
      * main method- accepts an argument from the command line and will set that 
@@ -120,24 +133,18 @@ public class MentionBot {
         new MentionBot( name ).run();
     }
 
-    /**
-     * inititalizes global variables.
-     */
-    private void initBotData() {
-        
-        replies = 0;
-        failures = 0;
-        lastReplyIndex = -1; 
-        cycles = 0;
-        
-        keys = new TwitterKeys();
-        
-        messages = new ArrayList<String>();
-        populateMessages();
-        
-    }
-
     /************************* MentionBot IO Methods ************************/
+    
+    /**
+     * getMostRecentTweet - returns the most recent tweet in the authenticating
+     * users timeline.
+     * 
+     * @return the most recent tweet
+     * @throws TwitterException 
+     */
+    private Status getMostRecentTweet() throws TwitterException {
+        return twitter.getHomeTimeline().get( 0 );
+    }
     
     /**
      * Posts a mention to the specified user's timeline.
@@ -166,32 +173,7 @@ public class MentionBot {
         } 
     }
 
-    /**
-     * getMostRecentTweet - returns the most recent tweet in the authenticating
-     * users timeline.
-     * 
-     * @return the most recent tweet
-     * @throws TwitterException 
-     */
-    private Status getMostRecentTweet() throws TwitterException {
-        return twitter.getHomeTimeline().get( 0 );
-    }
-
-    
-
     /********************** MentionBot Control Methods ***********************/
-    
-    /**
-     * add() - this method adds messages to the messages ArrayList, only if
-     * the total length with the target name is less than 140 characters.
-     * 
-     * @param s - message to be added
-     */
-    private void add( String s ) {
-        if ( ( "@" + targetScreenName + s ).length() <= 140 ) {
-            messages.add( s );
-        }
-    }
     
     /**
      * actOn - takes in the most recent status and decides what to do.  
@@ -210,58 +192,28 @@ public class MentionBot {
     }
 
     /**
-     * populateMessages - this method holds all of the replies that MentionBot
-     * can use. Since messages is an ArrayList, this allows the Authenticating
-     * User to add as many messages as they want.
-     */
-    private void populateMessages() {
-    
-        add( "Messages that the developer wants MentionBot to post" );
-        add( "as many as you want" );
-    }
-
-    /**
-     * gets a String that MentionBot will post.
+     * add() - this method adds messages to the messages ArrayList, only if
+     * the total length with the target name is less than 140 characters.
      * 
-     * @return a string to post
+     * @param s - message to be added
      */
-    private String getStatusString() {
-        Random rand = new Random();
-        int choice = -1;
-        
-        do {
-            choice = rand.nextInt( messages.size() );
-        } while ( choice == lastReplyIndex );
-        
-        String m = messages.get( choice );
-        
-        if ( m.equals( " Death Count: " ) ) {
-            // appends the number of replies to the message
-            m += replies;
+    private void add( String s ) {
+        if ( ( "@" + targetScreenName + s ).length() <= 140 ) {
+            messages.add( s );
         }
-        
-        return m;
     }
 
     /**
-     * run - main control method for MentionBot.
+     * ClearScreen - prints 25 blank lines to the console to clear it. 
+     * Method is designed for a standard terminal window of 80 x 24
      */
-    private void run() {
-       /* 
-        * if MentionBot keeps encountering Exceptions of any kind, I want it
-        * to shut down 
-        */
-        while ( failures < 5 ) {
-            try {
-                actOn( getMostRecentTweet() );
-                cycle();
-                
-            } catch ( TwitterException e ) {
-                sendErrorReport( e );
-            }
+    private void clearScreen() {
+        
+        for ( int i = 0; i < 25; i++ ) {
+            System.out.print( "\n" );
         }
+        
     }
-
 
     /**
      * cycle - prints out relevant information and then waits for one minute
@@ -283,12 +235,38 @@ public class MentionBot {
         
     }
 
+    /**
+     * gets a String that MentionBot will post.
+     * 
+     * @return a string to post
+     */
+    private String getStatusString() {
+        Random rand = new Random();
+        int choice = -1;
+        
+        do {
+            choice = rand.nextInt( messages.size() );
+        } while ( choice == lastReplyIndex );
+        
+        return messages.get( choice );
+    }
+
+    /**
+     * populateMessages - this method holds all of the replies that MentionBot
+     * can use. Since messages is an ArrayList, this allows the Authenticating
+     * User to add as many messages as they want.
+     */
+    private void populateMessages() {
+    
+        add( "Messages that the developer wants MentionBot to post" );
+        add( "as many as you want" );
+    }
 
     /**
      * Prints meta data to the console.
      */
     private void push() {
-       
+    
         System.out.println( "Replies to @" + targetScreenName + ": " 
                 + replies + " " );
         System.out.println( "MentionBot has been "
@@ -299,15 +277,23 @@ public class MentionBot {
     }
 
     /**
-     * ClearScreen - prints 25 blank lines to the console to clear it. 
-     * Method is designed for a standard terminal window of 80 x 24
+     * run - main control method for MentionBot.
      */
-    private void clearScreen() {
-        
-        for ( int i = 0; i < 25; i++ ) {
-            System.out.print( "\n" );
+    private void run() {
+       /* 
+        * if MentionBot keeps encountering Exceptions of any kind, I want it
+        * to shut down 
+        */
+        while ( failures < 5 ) {
+            try {
+                actOn( getMostRecentTweet() );
+                cycle();
+                
+            } catch ( TwitterException e ) {
+                sendErrorReport( e );
+            }
         }
-        
     }
 
 }
+
