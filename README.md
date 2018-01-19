@@ -1,6 +1,6 @@
 # MentionBot
 
-MentionBot is a Twitter Bot written in Java.
+MentionBot is a Twitter Application written in Java.
 
 On Startup, MentionBot takes a Username of a Twitter user and starts a control loop, if the target user
 posts anything to Twitter while MentionBot is running, it will post a mention ( @targetUserScreenName ) with
